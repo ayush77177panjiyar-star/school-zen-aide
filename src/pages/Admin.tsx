@@ -1,160 +1,212 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { LogIn, Users, FileCheck, CheckCircle, XCircle, IndianRupee } from "lucide-react";
+import {
+  LogIn,
+  Users,
+  Trash2,
+  PlusCircle,
+  IndianRupee,
+  Search
+} from "lucide-react";
+import axios from "axios";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 
-// Demo data
-const demoReceipts = [
-  { id: 1, student: "Aarav Kumar", class: "5A", amount: 1500, date: "2026-04-10", status: "pending", file: "receipt_001.jpg" },
-  { id: 2, student: "Priya Sharma", class: "8B", amount: 1000, date: "2026-04-08", status: "pending", file: "receipt_002.pdf" },
-  { id: 3, student: "Rahul Singh", class: "3C", amount: 500, date: "2026-04-05", status: "approved", file: "receipt_003.jpg" },
-];
+const API = "http://localhost:5000/api";
 
 const Admin = () => {
   const [loggedIn, setLoggedIn] = useState(false);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [receipts, setReceipts] = useState(demoReceipts);
 
+  const [students, setStudents] = useState([]);
+  const [search, setSearch] = useState("");
+
+  const [form, setForm] = useState({
+    name: "",
+    className: "",
+    section: "",
+    parentName: ""
+  });
+
+  const [payAmount, setPayAmount] = useState({});
+
+  // 🔐 LOGIN
   const handleLogin = () => {
     if (email === "admin@school.com" && password === "admin123") {
       setLoggedIn(true);
-      toast.success("Welcome, Admin!");
+      toast.success("Welcome Admin");
+      fetchStudents();
     } else {
-      toast.error("Invalid credentials. Try admin@school.com / admin123");
+      toast.error("Invalid Credentials");
     }
   };
 
-  const handleApprove = (id: number) => {
-    setReceipts((r) => r.map((x) => (x.id === id ? { ...x, status: "approved" } : x)));
-    toast.success("Receipt approved & fees deducted!");
+  // 📥 FETCH STUDENTS
+  const fetchStudents = async () => {
+    const res = await axios.get(`${API}/students`);
+    setStudents(res.data);
   };
 
-  const handleReject = (id: number) => {
-    setReceipts((r) => r.map((x) => (x.id === id ? { ...x, status: "rejected" } : x)));
-    toast.error("Receipt rejected.");
+  // ➕ ADD STUDENT
+  const addStudent = async () => {
+    await axios.post(`${API}/students/add`, form);
+    toast.success("Student Added");
+    fetchStudents();
   };
 
+  // ❌ DELETE STUDENT
+  const deleteStudent = async (id: string) => {
+    await axios.delete(`${API}/students/${id}`);
+    toast.success("Student Deleted");
+    fetchStudents();
+  };
+
+  // 💰 PAY FEES
+  const payFees = async (id: string) => {
+    const amount = payAmount[id];
+    if (!amount) return toast.error("Enter amount");
+
+    const res = await axios.post(`${API}/students/pay/${id}`, { amount });
+
+    toast.success(`Remaining Due: ₹${res.data.remainingDue}`);
+    fetchStudents();
+  };
+
+  // 🔍 SEARCH
+  const searchStudent = async () => {
+    const res = await axios.get(`${API}/students/search?name=${search}`);
+    setStudents(res.data);
+  };
+
+  // ⚠️ DEFAULTERS
+  const fetchDefaulters = async () => {
+    const res = await axios.get(`${API}/students/defaulters`);
+    setStudents(res.data);
+  };
+
+  useEffect(() => {
+    if (loggedIn) fetchStudents();
+  }, [loggedIn]);
+
+  // 🔐 LOGIN UI
   if (!loggedIn) {
     return (
       <div className="min-h-screen">
         <Navbar />
-        <div className="pt-24 flex items-center justify-center min-h-screen">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="w-[380px] glass">
-              <CardHeader className="text-center">
-                <div className="w-16 h-16 rounded-2xl gradient-bg flex items-center justify-center mx-auto mb-3">
-                  <LogIn className="w-8 h-8 text-primary-foreground" />
-                </div>
-                <CardTitle className="font-heading text-xl">Admin Login</CardTitle>
-                <p className="text-sm text-muted-foreground">DMP Holy Mission School</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                <Input placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} />
-                <Button className="w-full gradient-bg text-primary-foreground" onClick={handleLogin}>
-                  Sign In
-                </Button>
-                <p className="text-xs text-center text-muted-foreground">Demo: admin@school.com / admin123</p>
-              </CardContent>
-            </Card>
-          </motion.div>
+        <div className="pt-24 flex justify-center items-center">
+          <Card className="w-[350px] glass">
+            <CardHeader className="text-center">
+              <LogIn className="mx-auto mb-2" />
+              <CardTitle>Admin Login</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
+              <Input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
+              <Button className="w-full" onClick={handleLogin}>Login</Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
-  const pending = receipts.filter((r) => r.status === "pending");
-  const approved = receipts.filter((r) => r.status === "approved");
-
+  // 🧠 DASHBOARD
   return (
     <div className="min-h-screen">
       <Navbar />
-      <div className="pt-24 pb-16">
-        <div className="container mx-auto px-4">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-            <h1 className="font-heading text-3xl font-bold">Admin <span className="gradient-text">Dashboard</span></h1>
-            <p className="text-muted-foreground mt-1">Manage student payments and receipts</p>
-          </motion.div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            {[
-              { label: "Total Students", value: "1500+", icon: Users },
-              { label: "Pending Receipts", value: pending.length, icon: FileCheck },
-              { label: "Approved", value: approved.length, icon: CheckCircle },
-              { label: "Total Collected", value: "₹7.5L", icon: IndianRupee },
-            ].map((s, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-                <Card className="glass">
-                  <CardContent className="pt-6 text-center">
-                    <s.icon className="w-6 h-6 mx-auto mb-2 text-primary" />
-                    <p className="text-2xl font-heading font-bold">{s.value}</p>
-                    <p className="text-xs text-muted-foreground">{s.label}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+      <div className="pt-24 px-6">
 
-          {/* Receipts table */}
-          <Card className="glass">
-            <CardHeader>
-              <CardTitle className="font-heading">Payment Receipts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      <th className="pb-3 font-medium text-muted-foreground">Student</th>
-                      <th className="pb-3 font-medium text-muted-foreground">Class</th>
-                      <th className="pb-3 font-medium text-muted-foreground">Amount</th>
-                      <th className="pb-3 font-medium text-muted-foreground">Date</th>
-                      <th className="pb-3 font-medium text-muted-foreground">Status</th>
-                      <th className="pb-3 font-medium text-muted-foreground">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {receipts.map((r) => (
-                      <tr key={r.id} className="border-b border-border/50">
-                        <td className="py-3 font-medium">{r.student}</td>
-                        <td className="py-3">{r.class}</td>
-                        <td className="py-3">₹{r.amount}</td>
-                        <td className="py-3">{r.date}</td>
-                        <td className="py-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            r.status === "approved" ? "bg-green-100 text-green-700"
-                            : r.status === "rejected" ? "bg-red-100 text-red-700"
-                            : "bg-yellow-100 text-yellow-700"
-                          }`}>
-                            {r.status}
-                          </span>
-                        </td>
-                        <td className="py-3">
-                          {r.status === "pending" && (
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="ghost" className="text-green-600 h-8" onClick={() => handleApprove(r.id)}>
-                                <CheckCircle className="w-4 h-4" />
-                              </Button>
-                              <Button size="sm" variant="ghost" className="text-red-600 h-8" onClick={() => handleReject(r.id)}>
-                                <XCircle className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+        {/* HEADER */}
+        <motion.h1 className="text-3xl font-bold mb-6">
+          Admin Dashboard
+        </motion.h1>
+
+        {/* ADD STUDENT */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Add Student</CardTitle>
+          </CardHeader>
+          <CardContent className="grid md:grid-cols-4 gap-3">
+            <Input placeholder="Name" onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Input placeholder="Class" onChange={(e) => setForm({ ...form, className: e.target.value })} />
+            <Input placeholder="Section" onChange={(e) => setForm({ ...form, section: e.target.value })} />
+            <Input placeholder="Parent" onChange={(e) => setForm({ ...form, parentName: e.target.value })} />
+            <Button onClick={addStudent} className="md:col-span-4">
+              <PlusCircle className="mr-2" /> Add Student
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* SEARCH + FILTER */}
+        <div className="flex gap-3 mb-6">
+          <Input placeholder="Search student..." onChange={(e) => setSearch(e.target.value)} />
+          <Button onClick={searchStudent}>
+            <Search className="mr-2" /> Search
+          </Button>
+          <Button variant="outline" onClick={fetchStudents}>All</Button>
+          <Button variant="destructive" onClick={fetchDefaulters}>Defaulters</Button>
         </div>
+
+        {/* STUDENT TABLE */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Students</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Class</th>
+                  <th>Due</th>
+                  <th>Pay</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {students.map((s: any) => (
+                  <tr key={s._id} className="border-b">
+                    <td>{s.name}</td>
+                    <td>{s.className}-{s.section}</td>
+                    <td className="text-red-600">₹{s.totalDue}</td>
+
+                    <td>
+                      <Input
+                        placeholder="₹"
+                        onChange={(e) =>
+                          setPayAmount({ ...payAmount, [s._id]: Number(e.target.value) })
+                        }
+                      />
+                    </td>
+
+                    <td className="flex gap-2">
+                      <Button size="sm" onClick={() => payFees(s._id)}>
+                        <IndianRupee size={16} />
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteStudent(s._id)}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+
       </div>
     </div>
   );
